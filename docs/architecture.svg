@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">InboxRouter system architecture</title>
+  <desc id="desc">A Vercel React frontend communicates with a Render Express API, which coordinates OpenAI classification and grounded chat against Neon PostgreSQL.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0a14"/>
+      <stop offset="1" stop-color="#12102a"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7"/>
+    </marker>
+    <marker id="arrowCyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee"/>
+    </marker>
+    <style>
+      .label { font: 700 22px Inter, Segoe UI, Arial, sans-serif; fill: #f1f5f9; }
+      .sub { font: 500 14px Inter, Segoe UI, Arial, sans-serif; fill: #94a3b8; }
+      .small { font: 600 12px Inter, Segoe UI, Arial, sans-serif; fill: #94a3b8; letter-spacing: .04em; }
+      .mono { font: 600 13px 'JetBrains Mono', Consolas, monospace; fill: #c4b5fd; }
+      .item { font: 500 15px Inter, Segoe UI, Arial, sans-serif; fill: #cbd5e1; }
+      .card { fill: #12121f; stroke: rgba(255,255,255,.13); stroke-width: 1.5; }
+      .inner { fill: #1a1a2e; stroke: rgba(255,255,255,.09); stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)"/>
+  <circle cx="1320" cy="70" r="260" fill="#7c3aed" opacity=".08"/>
+  <circle cx="230" cy="850" r="250" fill="#2563eb" opacity=".06"/>
+
+  <text x="80" y="68" class="label" font-size="30">InboxRouter architecture</text>
+  <text x="80" y="98" class="sub">Email ingestion, durable routing decisions, grounded analytics, and operator workflows</text>
+
+  <!-- Frontend -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="145" width="1440" height="165" rx="20" class="card"/>
+    <rect x="80" y="145" width="8" height="165" rx="4" fill="url(#violet)"/>
+  </g>
+  <rect x="112" y="178" width="54" height="54" rx="16" fill="url(#violet)"/>
+  <text x="139" y="214" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="800" fill="white">IR</text>
+  <text x="190" y="187" class="small" fill="#c4b5fd">VERCEL / STATIC SPA</text>
+  <text x="190" y="218" class="label">React + Vite operator console</text>
+  <text x="190" y="246" class="sub">Dashboard · Batch · Tasks · Chat · Tests</text>
+  <rect x="850" y="183" width="600" height="78" rx="14" class="inner"/>
+  <text x="882" y="214" class="small">CLIENT CONFIGURATION</text>
+  <text x="882" y="241" class="mono">VITE_API_URL + VITE_CANDIDATE_ID</text>
+  <text x="882" y="263" class="sub">HTTPS JSON requests with CORS protection</text>
+
+  <!-- Render API -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="390" width="920" height="420" rx="20" class="card"/>
+    <rect x="80" y="390" width="8" height="420" rx="4" fill="url(#cyan)"/>
+  </g>
+  <text x="116" y="432" class="small" fill="#67e8f9">RENDER / NODE WEB SERVICE</text>
+  <text x="116" y="465" class="label">Express API and routing orchestrator</text>
+  <text x="116" y="492" class="sub">Binds to 0.0.0.0:$PORT · /health · CORS · JSON API</text>
+
+  <rect x="116" y="525" width="250" height="224" rx="14" class="inner"/>
+  <text x="142" y="558" class="small">PUBLIC CONTRACTS</text>
+  <text x="142" y="592" class="mono">POST /ingest</text>
+  <text x="142" y="620" class="mono">GET /tasks</text>
+  <text x="142" y="648" class="mono">PATCH /tasks/:id</text>
+  <text x="142" y="676" class="mono">POST /api/chat</text>
+  <text x="142" y="704" class="mono">GET /api/stats</text>
+
+  <rect x="390" y="525" width="280" height="224" rx="14" class="inner"/>
+  <text x="416" y="558" class="small">DOMAIN SERVICES</text>
+  <text x="416" y="592" class="item">Ingest + idempotency</text>
+  <text x="416" y="620" class="item">Classifier + fallback rules</text>
+  <text x="416" y="648" class="item">Thread reconciliation</text>
+  <text x="416" y="676" class="item">Run progress tracking</text>
+  <text x="416" y="704" class="item">Grounded chat intent handlers</text>
+
+  <rect x="694" y="525" width="270" height="224" rx="14" class="inner"/>
+  <text x="720" y="558" class="small">BATCH FLOW</text>
+  <text x="720" y="592" class="item">1. Persist ingest run</text>
+  <text x="720" y="620" class="item">2. Classify each email</text>
+  <text x="720" y="648" class="item">3. Upsert task / skip</text>
+  <text x="720" y="676" class="item">4. Record membership</text>
+  <text x="720" y="704" class="item">5. Poll progress</text>
+
+  <!-- Database -->
+  <g filter="url(#shadow)">
+    <rect x="1080" y="390" width="440" height="420" rx="20" class="card"/>
+    <rect x="1080" y="390" width="8" height="420" rx="4" fill="url(#green)"/>
+  </g>
+  <text x="1116" y="432" class="small" fill="#6ee7b7">NEON / POSTGRESQL</text>
+  <text x="1116" y="465" class="label">Durable source of truth</text>
+  <text x="1116" y="492" class="sub">Persistent state across deploys and replays</text>
+  <rect x="1116" y="525" width="368" height="224" rx="14" class="inner"/>
+  <text x="1142" y="558" class="small">CORE TABLES</text>
+  <text x="1142" y="592" class="item">tasks</text>
+  <text x="1142" y="620" class="item">processed_emails</text>
+  <text x="1142" y="648" class="item">ingest_runs</text>
+  <text x="1142" y="676" class="item">ingest_run_emails</text>
+  <text x="1142" y="704" class="sub">Indexes support candidate, thread, and run scopes</text>
+
+  <!-- External AI -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="875" width="440" height="70" rx="16" class="card"/>
+  </g>
+  <circle cx="116" cy="910" r="17" fill="#10a37f"/>
+  <text x="116" y="916" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="800" fill="white">AI</text>
+  <text x="150" y="906" class="label" font-size="17">OpenAI API</text>
+  <text x="150" y="929" class="sub">JSON classification, intent extraction, answer phrasing</text>
+
+  <!-- Monitoring -->
+  <g filter="url(#shadow)">
+    <rect x="1160" y="875" width="360" height="70" rx="16" class="card"/>
+  </g>
+  <circle cx="1196" cy="910" r="17" fill="#f59e0b"/>
+  <text x="1196" y="916" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="800" fill="white">+</text>
+  <text x="1230" y="906" class="label" font-size="17">Health + keepalive</text>
+  <text x="1230" y="929" class="sub">/health checks and optional 10-minute ping</text>
+
+  <!-- Connectors -->
+  <path d="M 800 310 L 800 382" stroke="#a855f7" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="820" y="350" class="small" fill="#c4b5fd">HTTPS API</text>
+
+  <path d="M 1000 635 L 1072 635" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+  <text x="1010" y="615" class="small" fill="#67e8f9">SQL + durable state</text>
+
+  <path d="M 520 875 C 520 835, 600 820, 610 760" stroke="#10a37f" stroke-width="3" fill="none" marker-end="url(#arrowCyan)"/>
+  <text x="545" y="850" class="small" fill="#6ee7b7">LLM calls</text>
+
+  <path d="M 1160 875 C 1110 835, 1040 820, 930 760" stroke="#f59e0b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <text x="1015" y="850" class="small" fill="#fbbf24">GET /health</text>
+</svg>
