@@ -45,6 +45,22 @@ app.use((req, res, next) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // Health check — used by UptimeRobot keep-warm
+app.get('/', (req, res) => {
+  res.status(200).json({
+    service: 'Sales Inbox Router API',
+    status: 'ok',
+    message: 'Backend is running. Use /health for health checks.',
+    endpoints: {
+      health: 'GET /health',
+      ingest: 'POST /ingest',
+      tasks: 'GET /tasks',
+      users: 'GET /users',
+      chat: 'POST /api/chat',
+      stats: 'GET /api/stats',
+    },
+  });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', model: process.env.OPENAI_MODEL || 'gpt-4o-mini', ts: new Date().toISOString() });
 });
