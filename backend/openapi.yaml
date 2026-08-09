@@ -1,0 +1,857 @@
+openapi: 3.0.3
+info:
+  title: InboxRouter API
+  version: 1.0.0
+  description: |
+    API contract for InboxRouter, an email classification and sales task routing service.
+    The service ingests email batches, creates or updates tasks, records intentional skips,
+    exposes grounded routing analytics, and supports read-only natural-language questions.
+  contact:
+    name: Mohd Aftaab
+    url: https://github.com/MoAftaab/inborouter
+servers:
+  - url: https://inborouter.onrender.com
+    description: Production Render service
+  - url: http://localhost:3000
+    description: Local backend
+tags:
+  - name: Service
+    description: Health checks and service metadata
+  - name: Tasks
+    description: Grader-facing task contract
+  - name: Ingest
+    description: Email batch ingestion and idempotent routing
+  - name: Analytics
+    description: Frontend-facing tasks, progress, and aggregate statistics
+  - name: Chat
+    description: Grounded read-only questions over routed email data
+  - name: Evaluation
+    description: Assignment test and sample-data endpoints
+paths:
+  /:
+    get:
+      tags: [Service]
+      summary: Get service summary
+      responses:
+        '200':
+          description: Backend is available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RootResponse'
+  /health:
+    get:
+      tags: [Service]
+      summary: Health check
+      description: Lightweight readiness endpoint for Render and uptime monitors.
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api-docs:
+    get:
+      tags: [Service]
+      summary: Open Swagger UI
+      responses:
+        '200':
+          description: Interactive Swagger UI HTML page.
+  /openapi.json:
+    get:
+      tags: [Service]
+      summary: Download the OpenAPI document as JSON
+      responses:
+        '200':
+          description: OpenAPI document.
+          content:
+            application/json:
+              schema:
+                type: object
+  /openapi.yaml:
+    get:
+      tags: [Service]
+      summary: Download the OpenAPI document as YAML
+      responses:
+        '200':
+          description: OpenAPI document.
+          content:
+            text/yaml:
+              schema:
+                type: string
+  /users:
+    get:
+      tags: [Service]
+      summary: List supported team members
+      responses:
+        '200':
+          description: Team roster keyed by user ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/TeamMember'
+  /tasks:
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      description: Creates one task. Duplicate source_email_id and candidate_id pairs are idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created or existing task returned for an idempotent duplicate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTaskResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - $ref: '#/components/parameters/CandidateId'
+        - $ref: '#/components/parameters/ThreadId'
+        - $ref: '#/components/parameters/SourceEmailId'
+        - $ref: '#/components/parameters/AssigneeId'
+      responses:
+        '200':
+          description: Tasks ordered newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/MissingCandidate'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /tasks/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchTaskRequest'
+      responses:
+        '200':
+          description: Updated task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid enum or no fields to update.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      responses:
+        '204':
+          description: Task deleted.
+        '404':
+          description: Task was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ingest:
+    post:
+      tags: [Ingest]
+      summary: Ingest and route an email batch
+      description: |
+        Processes a batch synchronously, with a maximum of 100 emails per request.
+        Every attempted email is associated with the run, including idempotent replays.
+        A repeated email does not create a duplicate task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Batch completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '400':
+          description: Invalid batch or batch exceeds 100 emails.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/tasks:
+    get:
+      tags: [Analytics]
+      summary: List enriched task and skipped-email data
+      parameters:
+        - $ref: '#/components/parameters/CandidateId'
+        - $ref: '#/components/parameters/AssigneeId'
+        - $ref: '#/components/parameters/Category'
+      responses:
+        '200':
+          description: Tasks joined with processing metadata and skipped emails.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichedTasksResponse'
+        '400':
+          $ref: '#/components/responses/MissingCandidate'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/stats:
+    get:
+      tags: [Analytics]
+      summary: Get aggregate routing statistics
+      description: Includes category, priority, skip-reason, spurious, and run-level breakdowns.
+      parameters:
+        - $ref: '#/components/parameters/CandidateId'
+      responses:
+        '200':
+          description: Aggregate statistics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '400':
+          $ref: '#/components/responses/MissingCandidate'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/ingest/{run_id}:
+    get:
+      tags: [Analytics]
+      summary: Get ingest progress
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/CandidateId'
+      responses:
+        '200':
+          description: Current or completed run progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestProgress'
+        '400':
+          $ref: '#/components/responses/MissingCandidate'
+        '404':
+          description: Run was not found for the candidate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/chat:
+    post:
+      tags: [Chat]
+      summary: Ask a grounded question about routed email data
+      description: |
+        Returns a natural-language answer and supporting_data generated from database facts.
+        Provide run_id or run_ids to scope the answer to one or more ingest runs.
+        This endpoint is read-only and refuses actions outside routing analytics.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Grounded answer with supporting data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Candidate or query is missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/generate-emails:
+    get:
+      tags: [Evaluation]
+      summary: Generate the sample email batch
+      description: Generates or loads the 250-email assignment fixture used by the demo.
+      responses:
+        '200':
+          description: Sample emails.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateEmailsResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/test/run:
+    get:
+      tags: [Evaluation]
+      summary: Run the assignment test suite
+      parameters:
+        - in: query
+          name: groups
+          description: Comma-separated test groups such as A,B,E,G.
+          schema:
+            type: string
+            example: A,B,E,G
+        - in: query
+          name: candidate_id
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Test results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResults'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  parameters:
+    CandidateId:
+      in: query
+      name: candidate_id
+      required: true
+      description: Candidate or tenant identifier used to isolate data.
+      schema:
+        type: string
+        format: email
+        example: moaftaab786@gmail.com
+    TaskId:
+      in: path
+      name: task_id
+      required: true
+      schema:
+        type: string
+        example: tsk_a1b2c3
+    RunId:
+      in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+        example: run_1723123456789
+    ThreadId:
+      in: query
+      name: thread_id
+      schema:
+        type: string
+    SourceEmailId:
+      in: query
+      name: source_email_id
+      schema:
+        type: string
+    AssigneeId:
+      in: query
+      name: assignee_id
+      schema:
+        type: string
+        enum: [u_aarti, u_rohit, u_meera, u_karan, u_divya, u_triage]
+    Category:
+      in: query
+      name: category
+      schema:
+        type: string
+        enum: [enterprise_rfp, smb_enquiry, marketing, alliances, finance, triage]
+  responses:
+    MissingCandidate:
+      description: candidate_id query parameter is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Unexpected server or dependency error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: candidate_id required
+        field:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+        details:
+          nullable: true
+      required: [error]
+    RootResponse:
+      type: object
+      properties:
+        service:
+          type: string
+          example: Sales Inbox Router API
+        status:
+          type: string
+          example: ok
+        message:
+          type: string
+        endpoints:
+          type: object
+          additionalProperties:
+            type: string
+      required: [service, status, message, endpoints]
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        model:
+          type: string
+          example: gpt-4o-mini
+        ts:
+          type: string
+          format: date-time
+      required: [status, model, ts]
+    TeamMember:
+      type: object
+      additionalProperties: true
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+    Task:
+      type: object
+      properties:
+        task_id:
+          type: string
+          example: tsk_a1b2c3
+        candidate_id:
+          type: string
+        source_email_id:
+          type: string
+        thread_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        assignee_id:
+          type: string
+          enum: [u_aarti, u_rohit, u_meera, u_karan, u_divya, u_triage]
+        category:
+          type: string
+          enum: [enterprise_rfp, smb_enquiry, marketing, alliances, finance, triage]
+        priority:
+          type: string
+          enum: [high, medium, low]
+        due_date:
+          type: string
+          nullable: true
+        deal_value_inr:
+          type: number
+          nullable: true
+        company_name:
+          type: string
+          nullable: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+      required: [task_id, candidate_id, source_email_id, thread_id, title, assignee_id, category, priority, confidence]
+    CreateTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/TaskInput'
+      required: [candidate_id, source_email_id, thread_id, title, assignee_id, category, priority, confidence]
+    TaskInput:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+          format: email
+        source_email_id:
+          type: string
+        thread_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        assignee_id:
+          type: string
+          enum: [u_aarti, u_rohit, u_meera, u_karan, u_divya, u_triage]
+        category:
+          type: string
+          enum: [enterprise_rfp, smb_enquiry, marketing, alliances, finance, triage]
+        priority:
+          type: string
+          enum: [high, medium, low]
+        due_date:
+          type: string
+          nullable: true
+        deal_value_inr:
+          type: number
+          nullable: true
+        company_name:
+          type: string
+          nullable: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    PatchTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/TaskInput'
+      description: At least one mutable task field must be provided.
+    EmailInput:
+      type: object
+      properties:
+        email_id:
+          type: string
+          example: em_001
+        thread_id:
+          type: string
+          example: th_001
+        message_index:
+          type: integer
+          minimum: 0
+        from_name:
+          type: string
+        from_email:
+          type: string
+          format: email
+        to:
+          type: string
+        cc:
+          type: array
+          items:
+            type: string
+        subject:
+          type: string
+        body:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        is_reply:
+          type: boolean
+      required: [email_id, thread_id, subject, body]
+    IngestRequest:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+          format: email
+          example: moaftaab786@gmail.com
+        run_id:
+          type: string
+          description: Optional client-supplied run identifier.
+        emails:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/EmailInput'
+      required: [candidate_id, emails]
+    IngestError:
+      type: object
+      properties:
+        email_id:
+          type: string
+        error:
+          type: string
+      required: [email_id, error]
+    IngestResponse:
+      type: object
+      properties:
+        run_id:
+          type: string
+        processed:
+          type: integer
+        tasks_created:
+          type: integer
+        tasks_updated:
+          type: integer
+        skipped:
+          type: integer
+        idempotent_replays:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestError'
+      required: [run_id, processed, tasks_created, tasks_updated, skipped, errors]
+    IngestProgress:
+      type: object
+      properties:
+        run_id:
+          type: string
+        candidate_id:
+          type: string
+        total:
+          type: integer
+        processed:
+          type: integer
+        tasks_created:
+          type: integer
+        tasks_updated:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [running, completed]
+        progress_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+      required: [run_id, candidate_id, total, processed, status, progress_percent]
+    EnrichedTasksResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Task'
+              - type: object
+                properties:
+                  decision:
+                    type: string
+                  skip_reason:
+                    type: string
+                    nullable: true
+                  llm_reasoning:
+                    type: string
+                    nullable: true
+                  processed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedEmail'
+        total_tasks:
+          type: integer
+        total_skipped:
+          type: integer
+      required: [tasks, skipped, total_tasks, total_skipped]
+    SkippedEmail:
+      type: object
+      properties:
+        email_id:
+          type: string
+        thread_id:
+          type: string
+        skip_reason:
+          type: string
+          enum: [spam, newsletter, out_of_office, other]
+        llm_reasoning:
+          type: string
+          nullable: true
+        processed_at:
+          type: string
+          format: date-time
+        candidate_id:
+          type: string
+    RunStats:
+      type: object
+      properties:
+        run_id:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        total:
+          type: integer
+        processed:
+          type: integer
+        tasks_created:
+          type: integer
+        tasks_updated:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: integer
+    StatsResponse:
+      type: object
+      properties:
+        processed:
+          type: integer
+        tasks_created:
+          type: integer
+        tasks_updated:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: integer
+        spurious_flagged:
+          type: integer
+        total_runs:
+          type: integer
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+        by_category:
+          type: object
+          additionalProperties:
+            type: integer
+        by_priority:
+          type: object
+          additionalProperties:
+            type: integer
+        by_skip_reason:
+          type: object
+          additionalProperties:
+            type: integer
+        by_run:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunStats'
+      required: [processed, tasks_created, tasks_updated, skipped, spurious_flagged, by_category, by_run]
+    ChatRequest:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+          format: email
+        query:
+          type: string
+          example: How many high priority tasks are there?
+        run_id:
+          type: string
+          description: Scope the question to one ingest run.
+        run_ids:
+          type: array
+          description: Scope the question to multiple ingest runs. Use this instead of run_id when needed.
+          items:
+            type: string
+      required: [candidate_id, query]
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        supporting_data:
+          type: object
+          additionalProperties: true
+        intent:
+          type: string
+        scope:
+          type: object
+          nullable: true
+          properties:
+            run_ids:
+              type: array
+              items:
+                type: string
+      required: [answer, supporting_data]
+    GenerateEmailsResponse:
+      type: object
+      properties:
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailInput'
+        count:
+          type: integer
+      required: [emails, count]
+    CreateTaskResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        candidate_id:
+          type: string
+        source_email_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [task_id, candidate_id, source_email_id, created_at]
+    TestResults:
+      type: object
+      properties:
+        total:
+          type: integer
+        passed:
+          type: integer
+        failed:
+          type: integer
+        avg_duration_ms:
+          type: integer
+        groups:
+          type: object
+          additionalProperties: true
+      required: [total, passed, failed, groups]

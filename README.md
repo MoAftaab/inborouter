@@ -117,6 +117,9 @@ The run-membership table. It records every email attempted in every run, includi
 | `GET` | `/` | Returns a human-friendly API service summary and endpoint list. |
 | `GET` | `/health` | Lightweight health/readiness response for Render and monitors. |
 | `GET` | `/users` | Returns the supported team roster. |
+| `GET` | `/api-docs` | Interactive Swagger UI for the complete API contract. |
+| `GET` | `/openapi.json` | Raw OpenAPI specification in JSON format. |
+| `GET` | `/openapi.yaml` | Raw OpenAPI specification in YAML format. |
 
 ### Task contract
 
@@ -168,6 +171,18 @@ The run-membership table. It records every email attempted in every run, includi
 ```
 
 The chat response contains a concise answer plus `supporting_data`, scope metadata, and out-of-scope flags when applicable.
+
+### Interactive Swagger documentation
+
+The backend serves a checked-in OpenAPI 3.0 contract from [`backend/openapi.yaml`](backend/openapi.yaml).
+After starting the backend, open [`http://localhost:3000/api-docs`](http://localhost:3000/api-docs) to try
+requests interactively. The deployed documentation is available at
+[`inborouter.onrender.com/api-docs`](https://inborouter.onrender.com/api-docs).
+
+The same contract is available as [`/openapi.json`](https://inborouter.onrender.com/openapi.json) and
+[`/openapi.yaml`](https://inborouter.onrender.com/openapi.yaml) for importing into Postman, Insomnia, or
+other API tooling. Routes that read candidate data require `candidate_id`; the ingest and chat schemas
+also document the 100-email batch limit and optional run-level chat scoping.
 
 ## Local development
 
@@ -374,6 +389,7 @@ A Redis-compatible queue such as BullMQ, a Render background worker, bounded con
 sales-inbox-router/
 |-- backend/
 |   |-- server.js                  Express app, CORS, health, startup
+|   |-- openapi.yaml               OpenAPI 3.0 contract used by Swagger UI
 |   |-- db.js                      PostgreSQL pool and schema initialization
 |   |-- routes/
 |   |   |-- tasks.js               Task API contract

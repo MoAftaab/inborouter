@@ -1,6 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yaml');
 const { initDB } = require('./db');
 const taskRoutes = require('./routes/tasks');
 const ingestRoutes = require('./routes/ingest');
@@ -11,6 +15,8 @@ const { startKeepalive } = require('./services/keepalive');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
+const openApiYaml = fs.readFileSync(path.join(__dirname, 'openapi.yaml'), 'utf8');
+const openApiDocument = YAML.parse(openApiYaml);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -57,6 +63,9 @@ app.get('/', (req, res) => {
       users: 'GET /users',
       chat: 'POST /api/chat',
       stats: 'GET /api/stats',
+      docs: 'GET /api-docs',
+      openapi_json: 'GET /openapi.json',
+      openapi_yaml: 'GET /openapi.yaml',
     },
   });
 });
@@ -64,6 +73,14 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', model: process.env.OPENAI_MODEL || 'gpt-4o-mini', ts: new Date().toISOString() });
 });
+
+// Interactive API docs and raw OpenAPI specifications.
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiDocument, {
+  customSiteTitle: 'InboxRouter API Docs',
+  explorer: true,
+}));
+app.get('/openapi.json', (req, res) => res.status(200).json(openApiDocument));
+app.get('/openapi.yaml', (req, res) => res.type('text/yaml').send(openApiYaml));
 
 // Task API (grader-facing)
 app.use('/tasks', taskRoutes);
